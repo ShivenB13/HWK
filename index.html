@@ -110,6 +110,11 @@
   .add-task button{background:var(--green);color:#fff;border:none;padding:0 18px;border-radius:8px;
     font-weight:700;cursor:pointer;font-family:inherit;}
   footer{max-width:1000px;color:var(--muted);font-size:.78rem;padding:8px 0 30px;}
+  .add-task input[type=date]{background:#fff;border:1px solid var(--line);padding:0 10px;
+    border-radius:8px;font-size:.85rem;font-family:inherit;color:var(--muted);}
+  .task-item .due{font-size:.76rem;color:var(--muted);margin-top:2px;}
+  .task-item .due.overdue{color:var(--red);}
+  .task-item .due.today{color:var(--amber);font-weight:700;}
   .plan-block{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px;}
   .plan-block.synthetic{border-style:dashed;}
   .plan-block h3{font-size:.95rem;margin:0 0 3px;}
@@ -176,6 +181,7 @@
     <div class="panel" id="panel-tasks">
       <div class="add-task">
         <input type="text" id="newTask" placeholder="Add a task…">
+        <input type="date" id="newTaskDue" title="Due date (optional)">
         <button id="addTaskBtn">Add</button>
       </div>
       <div id="tasks"></div>
@@ -301,16 +307,29 @@ function renderTimetable(){
 
 /* ---------- Tasks ---------- */
 let tasks = store.get('hh_tasks', []);
+function toggleTaskDone(id, val){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  t.done = val; store.set('hh_tasks', tasks); renderTasks();
+}
 function renderTasks(){
   const el = $('tasks'); el.innerHTML='';
   updateBadges();
   if(!tasks.length){ el.innerHTML = '<p class="empty">No tasks yet.</p>'; }
-  tasks.slice().sort((a,b)=>a.done-b.done).forEach(t=>{
+  const now = new Date(); now.setHours(0,0,0,0);
+  tasks.slice().sort((a,b)=> a.done-b.done || (a.due||'9999')<(b.due||'9999') ? -1 : 1).forEach(t=>{
+    let dueCls = '', dueLbl = '';
+    if(t.due){
+      const d = new Date(t.due+'T00:00:00');
+      const diff = (d-now)/86400000;
+      dueLbl = 'Due ' + d.toLocaleDateString(undefined,{weekday:'short', day:'numeric', month:'short'});
+      if(diff<0){ dueCls='overdue'; dueLbl = 'Overdue — '+dueLbl.replace('Due ',''); }
+      else if(diff===0){ dueCls='today'; dueLbl = 'Due today'; }
+    }
     const row = document.createElement('div'); row.className='task-item'+(t.done?' done':'');
     row.innerHTML = `<input type="checkbox" ${t.done?'checked':''}>
-      <span class="txt">${escapeHtml(t.text)}</span>
+      <div style="flex:1;"><span class="txt">${escapeHtml(t.text)}</span>${dueLbl?`<div class="due ${dueCls}">${escapeHtml(dueLbl)}</div>`:''}</div>
       <button class="del">×</button>`;
-    row.querySelector('input').onchange = e=>{ t.done = e.target.checked; store.set('hh_tasks',tasks); renderTasks(); };
+    row.querySelector('input').onchange = e=> toggleTaskDone(t.id, e.target.checked);
     row.querySelector('.del').onclick = ()=>{ tasks = tasks.filter(x=>x.id!==t.id); store.set('hh_tasks',tasks); renderTasks(); };
     el.appendChild(row);
   });
@@ -320,9 +339,10 @@ $('newTask').addEventListener('keydown', e=>{ if(e.key==='Enter') addTask(); });
 function addTask(){
   const v = $('newTask').value.trim();
   if(!v) return;
-  tasks.push({id: Date.now()+Math.random(), text:v, done:false});
+  const due = $('newTaskDue').value || null;
+  tasks.push({id: Date.now()+Math.random(), text:v, done:false, due});
   store.set('hh_tasks', tasks);
-  $('newTask').value='';
+  $('newTask').value=''; $('newTaskDue').value='';
   renderTasks();
 }
 
@@ -521,64 +541,94 @@ function renderPlan(){
   const dayPeriods = (timetable[todayKey]||[]).map(p=>({...p, ...parsePeriod(p.time)}))
     .sort((a,b)=>a.start-b.start);
 
-  const head = document.createElement('h2'); head.style.margin='0 0 14px';
+  const head = document.createElement('h2'); head.style.margin='0 0 6px';
   head.textContent = 'Suggested plan for '+todayKey+' ('+new Date().toLocaleDateString(undefined,{day:'numeric',month:'long'})+')';
   el.appendChild(head);
-
-  if(dayPeriods.length){
-    const sched = document.createElement('div'); sched.className='plan-block';
-    sched.innerHTML = '<h3>Today\'s timetable</h3>';
-    dayPeriods.forEach(p=>{
-      const row = document.createElement('div'); row.className='plan-mini';
-      row.innerHTML = `<span class="t">${escapeHtml(p.time)}</span><span>${escapeHtml(p.subject)}</span>`;
-      sched.appendChild(row);
-    });
-    el.appendChild(sched);
-  }
 
   const workBlocks = dayPeriods.filter(p=>/homework/i.test(p.subject) && p.end!=null);
   const synthetic = !workBlocks.length;
   const blocks = synthetic
-    ? [{time:'6:30–7:30 pm', subject:'Suggested focus block (no "Homework" slot found today)', start:18*60+30, end:19*60+30, synthetic:true}]
+    ? [{time:'6:30–7:30 pm', subject:'Suggested focus block', start:18*60+30, end:19*60+30, synthetic:true}]
     : workBlocks;
+  const totalMin = blocks.reduce((s,b)=>s+((b.end-b.start)||60),0);
+
+  const sub = document.createElement('p'); sub.style.cssText='color:var(--muted);font-size:.88rem;margin:0 0 20px;';
+  sub.textContent = synthetic
+    ? "Today's timetable doesn't have a slot named \"Homework\", so this suggests an evening block instead — edit it in the sidebar to match your real one."
+    : blocks.map(b=>b.time).join(' and ')+' is set aside for homework today ('+totalMin+' min total).';
+  el.appendChild(sub);
 
   const now = new Date(); now.setHours(0,0,0,0);
-  const queue = [];
-  homework.filter(h=>!h.done).sort((a,b)=>(a.dueDate?.getTime()||0)-(b.dueDate?.getTime()||0))
-    .forEach(h=>{
-      let urg = '';
-      if(h.dueDate){ const d=new Date(h.dueDate); d.setHours(0,0,0,0); const diff=(d-now)/86400000;
-        urg = diff<0? ' (overdue)' : diff===0? ' (due today)' : ''; }
-      queue.push({type:'hw', label: h.subject+': '+(h.title||'(untitled)')+urg});
-    });
-  tasks.filter(t=>!t.done).forEach(t=> queue.push({type:'task', label: t.text}));
+  const urgencyRank = (dateVal)=>{
+    if(!dateVal) return 5;
+    const d = new Date(dateVal); d.setHours(0,0,0,0);
+    const diff = (d-now)/86400000;
+    if(diff<0) return 0; if(diff===0) return 1; if(diff<=2) return 2; if(diff<=6) return 3; return 4;
+  };
+  const hwQueue = homework.filter(h=>!h.done).map(h=>({...h, rank: urgencyRank(h.dueDate)}))
+    .sort((a,b)=> a.rank-b.rank || (a.dueDate?.getTime()||0)-(b.dueDate?.getTime()||0));
+  const taskQueue = tasks.filter(t=>!t.done).map(t=>({...t, rank: urgencyRank(t.due)}))
+    .sort((a,b)=> a.rank-b.rank || (a.due||'9999').localeCompare(b.due||'9999'));
 
-  if(!queue.length){
+  if(!hwQueue.length && !taskQueue.length){
     const done = document.createElement('p'); done.className='empty';
-    done.textContent = 'Nothing open — all homework and tasks are ticked off.';
+    done.textContent = homework.length||tasks.length
+      ? 'Nothing open — all homework and tasks are ticked off.'
+      : 'Sync your homework and add some tasks to get a suggested plan.';
     el.appendChild(done);
     return;
   }
 
   const perItemMin = 15;
-  blocks.forEach(b=>{
-    const dur = (b.end - b.start) || 60;
-    const capacity = Math.max(1, Math.floor(dur/perItemMin));
-    const wrap = document.createElement('div'); wrap.className='plan-block'+(b.synthetic?' synthetic':'');
-    wrap.innerHTML = `<h3>${escapeHtml(b.subject)}</h3><div class="time-lbl">${escapeHtml(b.time)} · about ${dur} min</div>`;
-    for(let i=0;i<capacity && queue.length;i++){
-      const item = queue.shift();
-      const row = document.createElement('div'); row.className='plan-item';
-      row.innerHTML = `<span class="pill ${item.type}">${item.type==='hw'?'HW':'Task'}</span><span>${escapeHtml(item.label)}</span>`;
-      wrap.appendChild(row);
-    }
-    el.appendChild(wrap);
-  });
+  const capacity = Math.max(2, Math.floor(totalMin/perItemMin));
+  // interleave by urgency rank across both lists, capped to capacity
+  const merged = [...hwQueue.map(h=>({type:'hw', rank:h.rank, ref:h})), ...taskQueue.map(t=>({type:'task', rank:t.rank, ref:t}))]
+    .sort((a,b)=>a.rank-b.rank);
+  const chosen = merged.slice(0, capacity);
+  const leftover = merged.slice(capacity);
+  const chosenHw = chosen.filter(x=>x.type==='hw');
+  const chosenTasks = chosen.filter(x=>x.type==='task');
 
-  if(queue.length){
+  function dueLabel(dateVal, isTask){
+    if(!dateVal) return '';
+    const d = new Date(isTask? dateVal+'T00:00:00' : dateVal); d.setHours(0,0,0,0);
+    const diff = (d-now)/86400000;
+    if(diff<0) return 'overdue';
+    if(diff===0) return 'due today';
+    return 'due '+d.toLocaleDateString(undefined,{weekday:'short', day:'numeric', month:'short'});
+  }
+
+  if(chosenHw.length){
+    const block = document.createElement('div'); block.className='plan-block'+(synthetic?' synthetic':'');
+    block.innerHTML = '<h3>Homework to do today</h3>';
+    chosenHw.forEach(({ref:h})=>{
+      const row = document.createElement('div'); row.className='plan-item';
+      row.innerHTML = `<input type="checkbox" class="hw-check">
+        <span class="pill hw">HW</span>
+        <span>${escapeHtml(h.subject+': '+(h.title||'(untitled)'))}${h.dueDate? ' <span style="color:var(--muted);font-size:.8rem;">('+escapeHtml(dueLabel(h.dueDate))+')</span>':''}</span>`;
+      row.querySelector('.hw-check').onchange = e=> toggleHwDone(h.uid, e.target.checked);
+      block.appendChild(row);
+    });
+    el.appendChild(block);
+  }
+  if(chosenTasks.length){
+    const block = document.createElement('div'); block.className='plan-block'+(synthetic?' synthetic':'');
+    block.innerHTML = '<h3>Tasks to do today</h3>';
+    chosenTasks.forEach(({ref:t})=>{
+      const row = document.createElement('div'); row.className='plan-item';
+      row.innerHTML = `<input type="checkbox" class="hw-check">
+        <span class="pill task">Task</span>
+        <span>${escapeHtml(t.text)}${t.due? ' <span style="color:var(--muted);font-size:.8rem;">('+escapeHtml(dueLabel(t.due,true))+')</span>':''}</span>`;
+      row.querySelector('.hw-check').onchange = e=> toggleTaskDone(t.id, e.target.checked);
+      block.appendChild(row);
+    });
+    el.appendChild(block);
+  }
+
+  if(leftover.length){
     const lo = document.createElement('div'); lo.className='leftover';
-    lo.textContent = queue.length+' more item'+(queue.length>1?'s':'')+" didn't fit in today's homework time — carry to tomorrow: "
-      + queue.map(q=>q.label).join(', ');
+    lo.textContent = leftover.length+' more item'+(leftover.length>1?'s':'')+" didn't fit today's homework time: "
+      + leftover.map(x=> x.type==='hw'? x.ref.subject+': '+(x.ref.title||'') : x.ref.text).join(', ');
     el.appendChild(lo);
   }
 }
@@ -592,3 +642,24 @@ if($('icsUrl').value) checkDueNotifications();
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
