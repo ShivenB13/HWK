@@ -67,8 +67,10 @@
   h1{font-family:'Nunito Sans',sans-serif;font-size:1.9rem;font-weight:800;margin:0;}
   .tabs{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:22px;}
   .tab{padding:10px 2px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;
-    font-size:.95rem;}
+    font-size:.95rem;display:flex;align-items:center;gap:6px;}
   .tab.active{color:var(--text);border-color:var(--blue);}
+  .badge{background:var(--red);color:#fff;font-size:.68rem;font-weight:800;min-width:18px;height:18px;
+    border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;}
   .panel{display:none;}
   .panel.active{display:block;}
   .search-row{display:flex;gap:12px;align-items:center;margin-bottom:22px;flex-wrap:wrap;}
@@ -79,9 +81,12 @@
     letter-spacing:.03em;margin:22px 0 10px;}
   .group-h:first-child{margin-top:0;}
   .hw-card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--green);
-    border-radius:10px;display:flex;gap:18px;padding:16px 18px;margin-bottom:12px;align-items:flex-start;}
+    border-radius:10px;display:flex;gap:14px;padding:16px 18px;margin-bottom:12px;align-items:flex-start;}
   .hw-card.overdue{border-left-color:var(--red);}
   .hw-card.today{border-left-color:var(--amber);}
+  .hw-card.done{opacity:.55;}
+  .hw-card.done .hw-title{text-decoration:line-through;color:var(--muted);}
+  .hw-check{margin-top:6px;width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer;}
   .datebox{width:66px;flex-shrink:0;text-align:center;}
   .datebox .wd{font-size:.72rem;color:var(--muted);font-weight:700;}
   .datebox .dd{font-size:1.7rem;font-weight:800;line-height:1.1;}
@@ -105,6 +110,18 @@
   .add-task button{background:var(--green);color:#fff;border:none;padding:0 18px;border-radius:8px;
     font-weight:700;cursor:pointer;font-family:inherit;}
   footer{max-width:1000px;color:var(--muted);font-size:.78rem;padding:8px 0 30px;}
+  .plan-block{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px;}
+  .plan-block.synthetic{border-style:dashed;}
+  .plan-block h3{font-size:.95rem;margin:0 0 3px;}
+  .plan-block .time-lbl{font-size:.78rem;color:var(--muted);margin-bottom:10px;}
+  .plan-item{display:flex;gap:8px;align-items:center;font-size:.87rem;padding:5px 0;border-top:1px solid var(--line);}
+  .plan-item:first-of-type{border-top:none;}
+  .plan-item .pill{font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:10px;flex-shrink:0;}
+  .plan-item .pill.hw{background:#E8F0FB;color:var(--blue);}
+  .plan-item .pill.task{background:#EAF4DE;color:var(--green-dark);}
+  .plan-mini{font-size:.85rem;color:#4A5162;padding:4px 0;display:flex;gap:10px;}
+  .plan-mini .t{color:var(--muted);width:110px;flex-shrink:0;}
+  .leftover{font-size:.82rem;color:var(--muted);margin-top:6px;}
 </style>
 </head>
 <body>
@@ -141,9 +158,10 @@
       <h1>To-do list</h1>
     </div>
     <div class="tabs">
-      <div class="tab active" data-tab="hw">Homework</div>
-      <div class="tab" data-tab="tasks">My Tasks</div>
-      <div class="tab" data-tab="hw" id="notifTab" style="margin-left:auto;font-weight:600;">
+      <div class="tab active" data-tab="hw">Homework <span class="badge" id="hwBadge" style="display:none;"></span></div>
+      <div class="tab" data-tab="tasks">My Tasks <span class="badge" id="taskBadge" style="display:none;"></span></div>
+      <div class="tab" data-tab="plan">Plan</div>
+      <div class="tab" id="notifTab" style="margin-left:auto;font-weight:600;">
         <span id="notifBtn" style="color:var(--blue);cursor:pointer;">Enable reminders</span>
       </div>
     </div>
@@ -161,6 +179,10 @@
         <button id="addTaskBtn">Add</button>
       </div>
       <div id="tasks"></div>
+    </div>
+
+    <div class="panel" id="panel-plan">
+      <div id="plan"></div>
     </div>
   </main>
 </div>
@@ -187,11 +209,11 @@ function escapeHtml(s){
 /* ---------- Tabs ---------- */
 document.querySelectorAll('.tab[data-tab]').forEach(t=>{
   t.addEventListener('click', ()=>{
-    if(t.id==='notifTab') return;
     document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.remove('active'));
     t.classList.add('active');
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     $('panel-'+t.dataset.tab).classList.add('active');
+    if(t.dataset.tab==='plan') renderPlan();
   });
 });
 
@@ -222,19 +244,23 @@ const DEFAULT_TIMETABLE = {
     ["3:30–5:30 pm","Maths"],["5:30–7:00 pm","Fun"],["7:00–7:30 pm","Dinner"],
     ["7:30–8:30 pm","Hobby"],["8:30 pm","Sleep"]]
 };
-function to24h(label){
-  const m = label.match(/^(\d{1,2}):(\d{2})\s*(am|pm)/i);
-  if(!m) return '';
-  let h = +m[1]; const min = m[2]; const ap = m[3].toLowerCase();
-  if(ap==='pm' && h!==12) h+=12;
-  if(ap==='am' && h===12) h=0;
-  return String(h).padStart(2,'0')+':'+min;
+function parsePeriod(label){
+  const re = /(\d{1,2}):(\d{2})\s*(am|pm)?/gi;
+  const ms = [...(label||'').matchAll(re)];
+  const toMin = (h,m,ap)=>{ h=+h; if(ap==='pm' && h!==12) h+=12; if(ap==='am' && h===12) h=0; return h*60+ +m; };
+  if(ms.length>=2){
+    let ap1 = ms[0][3], ap2 = ms[1][3];
+    ap1 = ap1||ap2; ap2 = ap2||ap1;
+    return {start: toMin(ms[0][1],ms[0][2],ap1), end: toMin(ms[1][1],ms[1][2],ap2)};
+  }
+  if(ms.length===1) return {start: toMin(ms[0][1],ms[0][2],ms[0][3]), end: null};
+  return {start: 9999, end: null};
 }
 function seedTimetable(){
   const seeded = {};
   DAYS.forEach(day=>{
     seeded[day] = (DEFAULT_TIMETABLE[day]||[]).map(([time,subject])=>
-      ({id: Date.now()+Math.random(), time: to24h(time), subject}));
+      ({id: Date.now()+Math.random(), time, subject}));
   });
   return seeded;
 }
@@ -249,7 +275,7 @@ function renderTimetable(){
     const sum = document.createElement('summary');
     sum.innerHTML = `<span>${day}${i===TODAY_IDX?'<span class="today-badge">TODAY</span>':''}</span><span class="arrow">▸</span>`;
     det.appendChild(sum);
-    (timetable[day]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time)).forEach(p=>{
+    (timetable[day]||[]).slice().sort((a,b)=>parsePeriod(a.time).start-parsePeriod(b.time).start).forEach(p=>{
       const row = document.createElement('div'); row.className='period';
       row.innerHTML = `<span class="t">${p.time||''}</span><span class="s">${escapeHtml(p.subject)}</span>`;
       const del = document.createElement('button'); del.textContent='×';
@@ -277,6 +303,7 @@ function renderTimetable(){
 let tasks = store.get('hh_tasks', []);
 function renderTasks(){
   const el = $('tasks'); el.innerHTML='';
+  updateBadges();
   if(!tasks.length){ el.innerHTML = '<p class="empty">No tasks yet.</p>'; }
   tasks.slice().sort((a,b)=>a.done-b.done).forEach(t=>{
     const row = document.createElement('div'); row.className='task-item'+(t.done?' done':'');
@@ -342,11 +369,29 @@ function parseIcsDate(v){
 
 /* ---------- Homework rendering ---------- */
 let homework = store.get('hh_homework', []);
+function applyDoneStatus(){
+  const done = new Set(store.get('hh_hw_done', []));
+  homework.forEach(h=> h.done = done.has(h.uid));
+}
+function toggleHwDone(uid, val){
+  const done = new Set(store.get('hh_hw_done', []));
+  if(val) done.add(uid); else done.delete(uid);
+  store.set('hh_hw_done', [...done]);
+  const h = homework.find(x=>x.uid===uid); if(h) h.done = val;
+  renderHomework();
+}
+function updateBadges(){
+  const hwOpen = homework.filter(h=>!h.done).length;
+  const taskOpen = tasks.filter(t=>!t.done).length;
+  const hb = $('hwBadge'); hb.textContent = hwOpen; hb.style.display = hwOpen? 'inline-flex':'none';
+  const tb = $('taskBadge'); tb.textContent = taskOpen; tb.style.display = taskOpen? 'inline-flex':'none';
+}
 
 function renderHomework(){
   const el = $('homework'); el.innerHTML='';
   const q = ($('hwSearch').value||'').toLowerCase();
   let list = homework.filter(hw => !q || (hw.subject+' '+hw.title+' '+hw.className).toLowerCase().includes(q));
+  updateBadges();
   if(!list.length){ el.innerHTML = '<p class="empty">'+(homework.length? 'No matches.' : 'Add your calendar link in the sidebar and sync.')+'</p>'; return; }
   const now = new Date(); now.setHours(0,0,0,0);
   list = list.slice().sort((a,b)=> (a.dueDate?.getTime()||0) - (b.dueDate?.getTime()||0));
@@ -364,21 +409,23 @@ function renderHomework(){
     const h = document.createElement('div'); h.className='group-h'; h.textContent = label;
     el.appendChild(h);
     items.forEach(hw=>{
-      let cls='';
+      let cls = hw.done? 'done' : '';
       const due = hw.dueDate ? new Date(hw.dueDate) : null;
-      if(due){ due.setHours(0,0,0,0); const diff=(due-now)/86400000;
+      if(due && !hw.done){ due.setHours(0,0,0,0); const diff=(due-now)/86400000;
         if(diff<0) cls='overdue'; else if(diff===0) cls='today'; }
       const card = document.createElement('div'); card.className='hw-card '+cls;
       const wd = due? due.toLocaleDateString(undefined,{weekday:'short'}) : '';
       const dd = due? due.getDate() : '–';
       const mo = due? due.toLocaleDateString(undefined,{month:'short'}) : '';
       card.innerHTML = `
+        <input type="checkbox" class="hw-check" ${hw.done?'checked':''}>
         <div class="datebox"><div class="wd">${wd}</div><div class="dd">${dd}</div><div class="mo">${mo}</div></div>
         <div>
           ${hw.url? `<a class="hw-title" href="${hw.url}" target="_blank" rel="noopener">${escapeHtml(hw.title||hw.subject)}</a>`
                    : `<span class="hw-title" style="cursor:default;">${escapeHtml(hw.title||hw.subject)}</span>`}
           <div class="hw-meta">Homework for group <b>${escapeHtml(hw.className)}</b> - ${escapeHtml(hw.subject)}${hw.setBy? ' - '+escapeHtml(hw.setBy):''}</div>
         </div>`;
+      card.querySelector('.hw-check').onchange = e=> toggleHwDone(hw.uid, e.target.checked);
       el.appendChild(card);
     });
   });
@@ -415,6 +462,7 @@ async function syncIcs(){
       const text = await res.text();
       if(!text.includes('BEGIN:VCALENDAR')) throw new Error('response did not look like a calendar');
       homework = parseIcs(text);
+      applyDoneStatus();
       store.set('hh_homework', homework);
       status.textContent = 'Synced '+homework.length+' items via '+t.label;
       status.className='status ok';
@@ -433,6 +481,7 @@ $('icsFile').addEventListener('change', async e=>{
   if(!file) return;
   const text = await file.text();
   homework = parseIcs(text);
+  applyDoneStatus();
   store.set('hh_homework', homework);
   $('syncStatus').textContent = 'Imported '+homework.length+' items from file.';
   $('syncStatus').className='status ok';
@@ -465,7 +514,77 @@ function checkDueNotifications(){
 setInterval(checkDueNotifications, 30*60*1000);
 if('Notification' in window && Notification.permission === 'granted'){ $('notifBtn').textContent = 'Reminders on'; }
 
+/* ---------- Suggested plan ---------- */
+function renderPlan(){
+  const el = $('plan'); el.innerHTML = '';
+  const todayKey = DAYS[TODAY_IDX];
+  const dayPeriods = (timetable[todayKey]||[]).map(p=>({...p, ...parsePeriod(p.time)}))
+    .sort((a,b)=>a.start-b.start);
+
+  const head = document.createElement('h2'); head.style.margin='0 0 14px';
+  head.textContent = 'Suggested plan for '+todayKey+' ('+new Date().toLocaleDateString(undefined,{day:'numeric',month:'long'})+')';
+  el.appendChild(head);
+
+  if(dayPeriods.length){
+    const sched = document.createElement('div'); sched.className='plan-block';
+    sched.innerHTML = '<h3>Today\'s timetable</h3>';
+    dayPeriods.forEach(p=>{
+      const row = document.createElement('div'); row.className='plan-mini';
+      row.innerHTML = `<span class="t">${escapeHtml(p.time)}</span><span>${escapeHtml(p.subject)}</span>`;
+      sched.appendChild(row);
+    });
+    el.appendChild(sched);
+  }
+
+  const workBlocks = dayPeriods.filter(p=>/homework/i.test(p.subject) && p.end!=null);
+  const synthetic = !workBlocks.length;
+  const blocks = synthetic
+    ? [{time:'6:30–7:30 pm', subject:'Suggested focus block (no "Homework" slot found today)', start:18*60+30, end:19*60+30, synthetic:true}]
+    : workBlocks;
+
+  const now = new Date(); now.setHours(0,0,0,0);
+  const queue = [];
+  homework.filter(h=>!h.done).sort((a,b)=>(a.dueDate?.getTime()||0)-(b.dueDate?.getTime()||0))
+    .forEach(h=>{
+      let urg = '';
+      if(h.dueDate){ const d=new Date(h.dueDate); d.setHours(0,0,0,0); const diff=(d-now)/86400000;
+        urg = diff<0? ' (overdue)' : diff===0? ' (due today)' : ''; }
+      queue.push({type:'hw', label: h.subject+': '+(h.title||'(untitled)')+urg});
+    });
+  tasks.filter(t=>!t.done).forEach(t=> queue.push({type:'task', label: t.text}));
+
+  if(!queue.length){
+    const done = document.createElement('p'); done.className='empty';
+    done.textContent = 'Nothing open — all homework and tasks are ticked off.';
+    el.appendChild(done);
+    return;
+  }
+
+  const perItemMin = 15;
+  blocks.forEach(b=>{
+    const dur = (b.end - b.start) || 60;
+    const capacity = Math.max(1, Math.floor(dur/perItemMin));
+    const wrap = document.createElement('div'); wrap.className='plan-block'+(b.synthetic?' synthetic':'');
+    wrap.innerHTML = `<h3>${escapeHtml(b.subject)}</h3><div class="time-lbl">${escapeHtml(b.time)} · about ${dur} min</div>`;
+    for(let i=0;i<capacity && queue.length;i++){
+      const item = queue.shift();
+      const row = document.createElement('div'); row.className='plan-item';
+      row.innerHTML = `<span class="pill ${item.type}">${item.type==='hw'?'HW':'Task'}</span><span>${escapeHtml(item.label)}</span>`;
+      wrap.appendChild(row);
+    }
+    el.appendChild(wrap);
+  });
+
+  if(queue.length){
+    const lo = document.createElement('div'); lo.className='leftover';
+    lo.textContent = queue.length+' more item'+(queue.length>1?'s':'')+" didn't fit in today's homework time — carry to tomorrow: "
+      + queue.map(q=>q.label).join(', ');
+    el.appendChild(lo);
+  }
+}
+
 /* ---------- init ---------- */
+applyDoneStatus();
 renderTimetable();
 renderTasks();
 renderHomework();
