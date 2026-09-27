@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homework Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#16233D; --navy2:#1D2E4D; --navy-line:#2C3E60;
+    --green:#7CB342; --green-dark:#63922F;
+    --blue:#2D7DD2; --amber:#E4A000; --red:#D64545;
+    --bg:#F3F4F7; --card:#FFFFFF; --line:#E3E5EA;
+    --text:#232A36; --muted:#767F8F;
+    font-family:'Nunito Sans',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);}
+  .rainbow{height:4px;background:linear-gradient(90deg,#8C6FE0,#4E9BE0,#4EC0A6,#E8C34E,#E28A3D,#D65C5C);}
+  .app{display:flex;min-height:100vh;}
+  aside.sidebar{width:300px;flex-shrink:0;background:var(--navy);color:#fff;padding:24px 20px 40px;}
+  @media (max-width:880px){.app{flex-direction:column;} aside.sidebar{width:100%;}}
+  .brand{font-size:1.3rem;font-weight:800;margin-bottom:2px;}
+  .brand .dot{color:var(--green);}
+  .today-pill{display:inline-block;background:var(--navy2);border:1px solid var(--navy-line);
+    color:#C9D2E0;font-size:.78rem;padding:4px 10px;border-radius:20px;margin:10px 0 22px;}
+  .side-h{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#8C99B3;
+    margin:22px 0 10px;font-weight:700;}
+  details.day{border-bottom:1px solid var(--navy-line);}
+  details.day summary{cursor:pointer;padding:9px 2px;font-size:.86rem;font-weight:700;
+    display:flex;justify-content:space-between;align-items:center;list-style:none;}
+  details.day summary::-webkit-details-marker{display:none;}
+  details.day summary .arrow{color:#8C99B3;font-size:.75rem;transition:transform .15s;}
+  details.day[open] summary .arrow{transform:rotate(90deg);}
+  details.day[open] summary{color:var(--green);}
+  .today-badge{background:var(--green);color:var(--navy);font-size:.62rem;font-weight:800;
+    padding:1px 6px;border-radius:10px;margin-left:6px;}
+  .period{display:flex;gap:8px;font-size:.8rem;color:#C9D2E0;padding:5px 2px 5px 4px;}
+  .period .t{width:96px;flex-shrink:0;color:#8C99B3;font-variant-numeric:tabular-nums;}
+  .period button{background:none;border:none;color:#5C6980;cursor:pointer;padding:0 4px;font-size:.85rem;}
+  .add-period{display:flex;gap:5px;margin:6px 0 4px;}
+  .add-period input{flex:1;min-width:0;background:var(--navy2);border:1px solid var(--navy-line);
+    color:#fff;padding:5px 7px;border-radius:5px;font-size:.75rem;font-family:inherit;}
+  .add-period button{background:var(--green);border:none;color:var(--navy);border-radius:5px;
+    padding:0 9px;font-weight:800;cursor:pointer;}
+
+  .sync-box{background:var(--navy2);border:1px solid var(--navy-line);border-radius:10px;padding:14px;}
+  .sync-box label{font-size:.76rem;color:#AEB8CB;display:block;margin-bottom:6px;}
+  .sync-box input[type=url]{width:100%;background:var(--navy);border:1px solid var(--navy-line);
+    color:#fff;padding:8px 9px;border-radius:6px;font-size:.78rem;font-family:inherit;margin-bottom:8px;}
+  .sync-box button.main{width:100%;background:var(--green);color:var(--navy);border:none;
+    padding:9px;border-radius:6px;font-weight:800;cursor:pointer;font-family:inherit;}
+  .sync-box button.main:hover{background:#8CC653;}
+  .status{font-size:.75rem;margin-top:8px;color:#AEB8CB;}
+  .status.err{color:#F3A3A3;}
+  .status.ok{color:#A6DC7D;}
+  details.help summary{cursor:pointer;color:#8C99B3;font-size:.74rem;margin-top:10px;}
+  details.help p{font-size:.73rem;color:#9FA9BD;line-height:1.5;}
+  details.help .row{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+  details.help label{display:flex;align-items:center;gap:6px;font-size:.76rem;color:#C9D2E0;}
+  input[type=file]{color:#C9D2E0;font-size:.72rem;}
+
+  main.content{flex:1;padding:32px 40px;max-width:1000px;}
+  .top-row{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;margin-bottom:22px;}
+  h1{font-family:'Nunito Sans',sans-serif;font-size:1.9rem;font-weight:800;margin:0;}
+  .tabs{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-bottom:22px;}
+  .tab{padding:10px 2px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;
+    font-size:.95rem;}
+  .tab.active{color:var(--text);border-color:var(--blue);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .search-row{display:flex;gap:12px;align-items:center;margin-bottom:22px;flex-wrap:wrap;}
+  .search-row input[type=text]{flex:1;min-width:220px;background:#fff;border:1px solid var(--line);
+    padding:10px 14px;border-radius:8px;font-size:.9rem;font-family:inherit;}
+  .toggle-lbl{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted);white-space:nowrap;}
+  .group-h{font-size:.82rem;font-weight:800;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.03em;margin:22px 0 10px;}
+  .group-h:first-child{margin-top:0;}
+  .hw-card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--green);
+    border-radius:10px;display:flex;gap:18px;padding:16px 18px;margin-bottom:12px;align-items:flex-start;}
+  .hw-card.overdue{border-left-color:var(--red);}
+  .hw-card.today{border-left-color:var(--amber);}
+  .datebox{width:66px;flex-shrink:0;text-align:center;}
+  .datebox .wd{font-size:.72rem;color:var(--muted);font-weight:700;}
+  .datebox .dd{font-size:1.7rem;font-weight:800;line-height:1.1;}
+  .datebox .mo{font-size:.72rem;color:var(--muted);}
+  .hw-title{color:var(--blue);font-weight:700;font-size:1rem;text-decoration:none;}
+  .hw-title:hover{text-decoration:underline;}
+  .hw-desc{font-size:.86rem;color:#4A5162;margin:5px 0;}
+  .hw-meta{font-size:.8rem;color:var(--muted);}
+  .hw-meta b{color:#3A4152;}
+  .empty{color:var(--muted);font-size:.9rem;padding:16px 0;}
+
+  .task-item{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:8px;}
+  .task-item input[type=checkbox]{margin-top:2px;width:18px;height:18px;accent-color:var(--green);}
+  .task-item.done .txt{text-decoration:line-through;color:var(--muted);}
+  .task-item .txt{flex:1;font-size:.92rem;padding-top:1px;}
+  .task-item .del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;}
+  .add-task{display:flex;gap:8px;margin:16px 0 4px;}
+  .add-task input{flex:1;background:#fff;border:1px solid var(--line);padding:10px 14px;
+    border-radius:8px;font-size:.9rem;font-family:inherit;}
+  .add-task button{background:var(--green);color:#fff;border:none;padding:0 18px;border-radius:8px;
+    font-weight:700;cursor:pointer;font-family:inherit;}
+  footer{max-width:1000px;color:var(--muted);font-size:.78rem;padding:8px 0 30px;}
+</style>
+</head>
+<body>
+<div class="rainbow"></div>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">Homework <span class="dot">Hub</span></div>
+    <div class="today-pill" id="todayPill"></div>
+
+    <div class="side-h">Timetable</div>
+    <div id="timetable"></div>
+
+    <div class="side-h">Sync calendar</div>
+    <div class="sync-box">
+      <label for="icsUrl">Satchel One calendar link (saved only in this browser)</label>
+      <input type="url" id="icsUrl" placeholder="https://api.satchelone.com/icalendars.ics?token=...">
+      <button id="syncBtn" class="main">Sync homework</button>
+      <div class="status" id="syncStatus"></div>
+      <details class="help">
+        <summary>If sync fails</summary>
+        <p>Satchel One usually blocks direct requests from other sites. Try the proxy fallback, or download the
+          .ics file from Satchel One's "Sync calendar" page and import it here.</p>
+        <div class="row">
+          <label><input type="checkbox" id="useProxy"> use proxy fallback</label>
+          <input type="file" id="icsFile" accept=".ics">
+        </div>
+      </details>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="top-row">
+      <h1>To-do list</h1>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="hw">Homework</div>
+      <div class="tab" data-tab="tasks">My Tasks</div>
+      <div class="tab" data-tab="hw" id="notifTab" style="margin-left:auto;font-weight:600;">
+        <span id="notifBtn" style="color:var(--blue);cursor:pointer;">Enable reminders</span>
+      </div>
+    </div>
+
+    <div class="panel active" id="panel-hw">
+      <div class="search-row">
+        <input type="text" id="hwSearch" placeholder="Filter by subject or title…">
+      </div>
+      <div id="homework"><p class="empty">Add your calendar link in the sidebar and sync.</p></div>
+    </div>
+
+    <div class="panel" id="panel-tasks">
+      <div class="add-task">
+        <input type="text" id="newTask" placeholder="Add a task…">
+        <button id="addTaskBtn">Add</button>
+      </div>
+      <div id="tasks"></div>
+    </div>
+  </main>
+</div>
+
+<footer class="wrap" style="margin:0 40px;">
+  Everything here (tasks, timetable, calendar link) is stored only in this browser's local storage. Reminders only
+  fire while this tab is open — a static site can't send notifications once it's closed.
+</footer>
+
+<script>
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const $ = id => document.getElementById(id);
+$('todayPill').textContent = new Date().toLocaleDateString(undefined,
+  {weekday:'long', day:'numeric', month:'long'});
+
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v);}catch(e){return d;} },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll('.tab[data-tab]').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    if(t.id==='notifTab') return;
+    document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    $('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---------- Timetable ---------- */
+const DEFAULT_TIMETABLE = {
+  Mon:[["7:20 am","Wake up"],["1:00 pm","Debating"],["3:30 pm","School ends"],
+    ["3:30–4:15 pm","Rest"],["4:15–6:30 pm","VEX"],["6:30–7:30 pm","Homework"],
+    ["7:30–8:00 pm","Dinner"],["8:00–9:00 pm","Maths or hobby"],["9:00 pm","Sleep"]],
+  Tue:[["7:20 am","Wake up"],["3:30 pm","School ends"],["3:30–5:30 pm","RAF training"],
+    ["5:30–6:00 pm","Rest"],["6:00–7:00 pm","Homework"],["7:00–7:30 pm","Dinner"],
+    ["7:30–9:00 pm","Hobby"],["9:00 pm","Sleep"]],
+  Wed:[["7:20 am","Wake up"],["3:03 pm","School ends"],["3:03–5:00 pm","Gym"],
+    ["5:00–5:45 pm","Rest"],["5:45–6:45 pm","Homework"],["6:45–7:30 pm","Hobby"],
+    ["7:30–8:00 pm","Dinner"],["8:00–9:00 pm","Hobby"],["9:00 pm","Sleep"]],
+  Thu:[["7:20 am","Wake up"],["3:30 pm","School ends"],["3:30–4:15 pm","Rest"],
+    ["4:15–6:30 pm","VEX"],["6:30–7:30 pm","Homework"],["7:30–8:00 pm","Dinner"],
+    ["8:00–9:00 pm","Maths or hobby"],["9:00 pm","Sleep"]],
+  Fri:[["7:20 am","Wake up"],["3:10 pm","School ends"],["3:10–5:00 pm","Robotics at school"],
+    ["5:00–5:45 pm","Rest"],["5:45–6:30 pm","Homework"],["6:30–7:00 pm","Fun"],
+    ["7:00–7:30 pm","Dinner"],["7:30–9:00 pm","Hobby or fun"],["9:00 pm","Sleep"]],
+  Sat:[["8:30 am","Wake up"],["9:00–10:00 am","Maths"],["10:00–10:30 am","Rest"],
+    ["10:30 am–12:00 pm","Homework"],["12:00–12:30 pm","Fun"],["12:30–1:00 pm","Lunch"],
+    ["1:00–1:30 pm","Fun"],["1:30–3:30 pm","Maths"],["3:30–5:00 pm","VEX"],
+    ["5:00–6:00 pm","Benzi homework"],["6:00–7:00 pm","Hobby"],["7:00–7:30 pm","Dinner"],
+    ["7:30–9:00 pm","Hobby"],["9:00 pm","Sleep"]],
+  Sun:[["8:30 am","Wake up"],["8:30–9:30 am","Breakfast"],["9:30–10:30 am","Homework"],
+    ["10:30 am–12:30 pm","Hobby"],["12:30–1:00 pm","Lunch"],["1:00–3:30 pm","VEX"],
+    ["3:30–5:30 pm","Maths"],["5:30–7:00 pm","Fun"],["7:00–7:30 pm","Dinner"],
+    ["7:30–8:30 pm","Hobby"],["8:30 pm","Sleep"]]
+};
+function to24h(label){
+  const m = label.match(/^(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  if(!m) return '';
+  let h = +m[1]; const min = m[2]; const ap = m[3].toLowerCase();
+  if(ap==='pm' && h!==12) h+=12;
+  if(ap==='am' && h===12) h=0;
+  return String(h).padStart(2,'0')+':'+min;
+}
+function seedTimetable(){
+  const seeded = {};
+  DAYS.forEach(day=>{
+    seeded[day] = (DEFAULT_TIMETABLE[day]||[]).map(([time,subject])=>
+      ({id: Date.now()+Math.random(), time: to24h(time), subject}));
+  });
+  return seeded;
+}
+let timetable = store.get('hh_timetable', null) || seedTimetable();
+const TODAY_IDX = [6,0,1,2,3,4,5][new Date().getDay()];
+
+function renderTimetable(){
+  const el = $('timetable'); el.innerHTML = '';
+  DAYS.forEach((day,i)=>{
+    const det = document.createElement('details'); det.className='day';
+    if(i===TODAY_IDX) det.open = true;
+    const sum = document.createElement('summary');
+    sum.innerHTML = `<span>${day}${i===TODAY_IDX?'<span class="today-badge">TODAY</span>':''}</span><span class="arrow">▸</span>`;
+    det.appendChild(sum);
+    (timetable[day]||[]).slice().sort((a,b)=>a.time.localeCompare(b.time)).forEach(p=>{
+      const row = document.createElement('div'); row.className='period';
+      row.innerHTML = `<span class="t">${p.time||''}</span><span class="s">${escapeHtml(p.subject)}</span>`;
+      const del = document.createElement('button'); del.textContent='×';
+      del.onclick = ()=>{ timetable[day] = timetable[day].filter(x=>x.id!==p.id); store.set('hh_timetable',timetable); renderTimetable(); };
+      row.appendChild(del);
+      det.appendChild(row);
+    });
+    const add = document.createElement('div'); add.className='add-period';
+    add.innerHTML = `<input type="time" class="pt"><input type="text" class="ps" placeholder="Subject"><button class="pa">+</button>`;
+    add.querySelector('.pa').onclick = ()=>{
+      const t = add.querySelector('.pt').value;
+      const s = add.querySelector('.ps').value.trim();
+      if(!s) return;
+      timetable[day] = timetable[day] || [];
+      timetable[day].push({id: Date.now()+Math.random(), time:t, subject:s});
+      store.set('hh_timetable', timetable);
+      renderTimetable();
+    };
+    det.appendChild(add);
+    el.appendChild(det);
+  });
+}
+
+/* ---------- Tasks ---------- */
+let tasks = store.get('hh_tasks', []);
+function renderTasks(){
+  const el = $('tasks'); el.innerHTML='';
+  if(!tasks.length){ el.innerHTML = '<p class="empty">No tasks yet.</p>'; }
+  tasks.slice().sort((a,b)=>a.done-b.done).forEach(t=>{
+    const row = document.createElement('div'); row.className='task-item'+(t.done?' done':'');
+    row.innerHTML = `<input type="checkbox" ${t.done?'checked':''}>
+      <span class="txt">${escapeHtml(t.text)}</span>
+      <button class="del">×</button>`;
+    row.querySelector('input').onchange = e=>{ t.done = e.target.checked; store.set('hh_tasks',tasks); renderTasks(); };
+    row.querySelector('.del').onclick = ()=>{ tasks = tasks.filter(x=>x.id!==t.id); store.set('hh_tasks',tasks); renderTasks(); };
+    el.appendChild(row);
+  });
+}
+$('addTaskBtn').onclick = addTask;
+$('newTask').addEventListener('keydown', e=>{ if(e.key==='Enter') addTask(); });
+function addTask(){
+  const v = $('newTask').value.trim();
+  if(!v) return;
+  tasks.push({id: Date.now()+Math.random(), text:v, done:false});
+  store.set('hh_tasks', tasks);
+  $('newTask').value='';
+  renderTasks();
+}
+
+/* ---------- ICS parsing ---------- */
+function unfold(raw){
+  const lines = raw.split(/\r\n|\n|\r/);
+  const out = [];
+  for(const line of lines){
+    if((line.startsWith(' ') || line.startsWith('\t')) && out.length){
+      out[out.length-1] += line.slice(1);
+    } else out.push(line);
+  }
+  return out;
+}
+function parseIcs(raw){
+  const lines = unfold(raw);
+  const events = []; let cur = null;
+  for(const line of lines){
+    if(line === 'BEGIN:VEVENT'){ cur = {}; continue; }
+    if(line === 'END:VEVENT'){ if(cur) events.push(cur); cur=null; continue; }
+    if(!cur) continue;
+    const idx = line.indexOf(':');
+    if(idx === -1) continue;
+    cur[line.slice(0, idx).split(';')[0]] = line.slice(idx+1);
+  }
+  return events.map(ev=>{
+    const desc = (ev.DESCRIPTION||'').replace(/\\n/g,'\n').replace(/\\,/g,',');
+    const dlines = desc.split('\n').map(l=>l.trim()).filter(Boolean);
+    const get = label => { const l = dlines.find(x=>x.startsWith(label)); return l? l.slice(label.length).trim() : ''; };
+    const subject = dlines[0] || (ev.SUMMARY||'').split(':').pop();
+    return {
+      uid: ev.UID, subject, className: get('Class Name:'), title: get('Homework Title:'),
+      setBy: get('Set By:'), setOn: get('Set On:'), dueOn: get('Due On:'),
+      dueDate: parseIcsDate(ev.DTSTART), url: ev.URL || ''
+    };
+  });
+}
+function parseIcsDate(v){
+  if(!v) return null;
+  const m = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/);
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+}
+
+/* ---------- Homework rendering ---------- */
+let homework = store.get('hh_homework', []);
+
+function renderHomework(){
+  const el = $('homework'); el.innerHTML='';
+  const q = ($('hwSearch').value||'').toLowerCase();
+  let list = homework.filter(hw => !q || (hw.subject+' '+hw.title+' '+hw.className).toLowerCase().includes(q));
+  if(!list.length){ el.innerHTML = '<p class="empty">'+(homework.length? 'No matches.' : 'Add your calendar link in the sidebar and sync.')+'</p>'; return; }
+  const now = new Date(); now.setHours(0,0,0,0);
+  list = list.slice().sort((a,b)=> (a.dueDate?.getTime()||0) - (b.dueDate?.getTime()||0));
+  const groups = {Overdue:[], 'This week':[], Later:[]};
+  list.forEach(hw=>{
+    if(!hw.dueDate){ groups.Later.push(hw); return; }
+    const due = new Date(hw.dueDate); due.setHours(0,0,0,0);
+    const diff = (due-now)/86400000;
+    if(diff<0) groups.Overdue.push(hw);
+    else if(diff<=6) groups['This week'].push(hw);
+    else groups.Later.push(hw);
+  });
+  Object.entries(groups).forEach(([label, items])=>{
+    if(!items.length) return;
+    const h = document.createElement('div'); h.className='group-h'; h.textContent = label;
+    el.appendChild(h);
+    items.forEach(hw=>{
+      let cls='';
+      const due = hw.dueDate ? new Date(hw.dueDate) : null;
+      if(due){ due.setHours(0,0,0,0); const diff=(due-now)/86400000;
+        if(diff<0) cls='overdue'; else if(diff===0) cls='today'; }
+      const card = document.createElement('div'); card.className='hw-card '+cls;
+      const wd = due? due.toLocaleDateString(undefined,{weekday:'short'}) : '';
+      const dd = due? due.getDate() : '–';
+      const mo = due? due.toLocaleDateString(undefined,{month:'short'}) : '';
+      card.innerHTML = `
+        <div class="datebox"><div class="wd">${wd}</div><div class="dd">${dd}</div><div class="mo">${mo}</div></div>
+        <div>
+          ${hw.url? `<a class="hw-title" href="${hw.url}" target="_blank" rel="noopener">${escapeHtml(hw.title||hw.subject)}</a>`
+                   : `<span class="hw-title" style="cursor:default;">${escapeHtml(hw.title||hw.subject)}</span>`}
+          <div class="hw-meta">Homework for group <b>${escapeHtml(hw.className)}</b> - ${escapeHtml(hw.subject)}${hw.setBy? ' - '+escapeHtml(hw.setBy):''}</div>
+        </div>`;
+      el.appendChild(card);
+    });
+  });
+}
+$('hwSearch').addEventListener('input', renderHomework);
+
+/* ---------- Sync ---------- */
+$('icsUrl').value = store.get('hh_ics_url','');
+$('useProxy').checked = store.get('hh_use_proxy', false);
+$('useProxy').onchange = ()=> store.set('hh_use_proxy', $('useProxy').checked);
+$('syncBtn').onclick = syncIcs;
+
+function syncTargets(url){
+  const targets = [{label:'direct', url}];
+  if($('useProxy').checked){
+    targets.push({label:'proxy (allorigins)', url:'https://api.allorigins.win/raw?url='+encodeURIComponent(url)});
+    targets.push({label:'proxy (corsproxy.io)', url:'https://corsproxy.io/?url='+encodeURIComponent(url)});
+    targets.push({label:'proxy (r.jina.ai)', url:'https://r.jina.ai/'+url});
+  }
+  return targets;
+}
+async function syncIcs(){
+  const url = $('icsUrl').value.trim();
+  const status = $('syncStatus');
+  if(!url){ status.textContent = 'Paste your calendar link first.'; status.className='status err'; return; }
+  store.set('hh_ics_url', url);
+  const targets = syncTargets(url);
+  const errors = [];
+  for(const t of targets){
+    status.textContent = 'Trying '+t.label+'…'; status.className='status';
+    try{
+      const res = await fetch(t.url, {cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const text = await res.text();
+      if(!text.includes('BEGIN:VCALENDAR')) throw new Error('response did not look like a calendar');
+      homework = parseIcs(text);
+      store.set('hh_homework', homework);
+      status.textContent = 'Synced '+homework.length+' items via '+t.label;
+      status.className='status ok';
+      renderHomework(); checkDueNotifications();
+      return;
+    }catch(e){ errors.push(t.label+': '+e.message); }
+  }
+  status.innerHTML = (!$('useProxy').checked
+      ? 'Direct sync failed. Tick "use proxy fallback" and sync again, or import the .ics file.<br>'
+      : 'All sync routes failed. Import the .ics file instead.<br>')
+    + '<span style="font-size:.68rem;">'+escapeHtml(errors.join(' · '))+'</span>';
+  status.className='status err';
+}
+$('icsFile').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const text = await file.text();
+  homework = parseIcs(text);
+  store.set('hh_homework', homework);
+  $('syncStatus').textContent = 'Imported '+homework.length+' items from file.';
+  $('syncStatus').className='status ok';
+  renderHomework(); checkDueNotifications();
+});
+
+/* ---------- Notifications ---------- */
+$('notifBtn').onclick = async ()=>{
+  if(!('Notification' in window)){ alert('Notifications are not supported in this browser.'); return; }
+  const perm = await Notification.requestPermission();
+  if(perm === 'granted'){ $('notifBtn').textContent = 'Reminders on'; checkDueNotifications(); }
+};
+function checkDueNotifications(){
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  const notified = store.get('hh_notified', []);
+  const now = new Date(); now.setHours(0,0,0,0);
+  let changed = false;
+  homework.forEach(hw=>{
+    if(!hw.dueDate) return;
+    const due = new Date(hw.dueDate); due.setHours(0,0,0,0);
+    const diff = (due-now)/86400000;
+    const key = hw.uid+'|'+due.toDateString();
+    if((diff===0||diff===1) && !notified.includes(key)){
+      new Notification(diff===0?'Homework due today':'Homework due tomorrow', {body: hw.subject+': '+(hw.title||'')});
+      notified.push(key); changed = true;
+    }
+  });
+  if(changed) store.set('hh_notified', notified);
+}
+setInterval(checkDueNotifications, 30*60*1000);
+if('Notification' in window && Notification.permission === 'granted'){ $('notifBtn').textContent = 'Reminders on'; }
+
+/* ---------- init ---------- */
+renderTimetable();
+renderTasks();
+renderHomework();
+if($('icsUrl').value) checkDueNotifications();
+</script>
+</body>
+</html>
